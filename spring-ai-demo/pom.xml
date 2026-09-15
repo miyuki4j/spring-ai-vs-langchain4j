@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- Spring Boot 4.1.1（2026-09 时点 4.1 线最新 GA，java.version 默认 17） -->
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>4.1.1</version>
+        <relativePath/>
+    </parent>
+
+    <groupId>com.example</groupId>
+    <artifactId>spring-ai-demo</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <name>spring-ai-demo</name>
+    <description>Spring AI 2.0.1 学习项目</description>
+
+    <properties>
+        <java.version>17</java.version>
+        <spring-ai.version>2.0.1</spring-ai.version>
+    </properties>
+
+    <!-- 用 BOM 统一管理 spring-ai-* 各模块版本，下面就不用手写 version 了 -->
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.springframework.ai</groupId>
+                <artifactId>spring-ai-bom</artifactId>
+                <version>${spring-ai.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <dependencies>
+        <!--
+          注意：Spring Boot 4 里 spring-boot-starter-web 已被废弃（pom description 原文写着
+          "deprecated in favor of spring-boot-starter-webmvc"）。Boot 4 请用下面这个。
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webmvc</artifactId>
+        </dependency>
+
+        <!--
+          模型接入：DeepSeek 专用 starter。
+          它不是"拿 OpenAI 兼容凑合"——Spring AI 为 DeepSeek 单独实现了 DeepSeekChatModel，
+          正确处理了 DeepSeek 的接口路径（默认 /chat/completions，没有 /v1），
+          并且把 thinking 模式、reasoning-effort、reasoning_content 做成了原生配置项。
+          换成走 OpenAI starter 的话，路径得手动改成 /chat/completions，这些参数也没有。
+        -->
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-starter-model-deepseek</artifactId>
+        </dependency>
+
+        <!--
+          想换回 OpenAI / 任意 OpenAI 兼容端点？把上面那个换成下面这个即可。
+          注意：ChatController 里的业务代码一行都不用改 —— 这就是 ChatClient 这层抽象的价值。
+          <dependency>
+              <groupId>org.springframework.ai</groupId>
+              <artifactId>spring-ai-starter-model-openai</artifactId>
+          </dependency>
+        -->
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!--
+          ===== 下面这些按学习进度逐个打开（都在 spring-ai-bom 2.0.1 里，去掉注释即可）=====
+
+          1) 多轮对话记忆（你的 16 周计划里"对话状态管理"用得上）
+          <dependency>
+              <groupId>org.springframework.ai</groupId>
+              <artifactId>spring-ai-starter-model-chat-memory</artifactId>
+          </dependency>
+          <dependency>
+              <groupId>org.springframework.ai</groupId>
+              <artifactId>spring-ai-starter-model-chat-memory-repository-jdbc</artifactId>
+          </dependency>
+
+          2) MCP（2026 年最硬的关键词；你的 spec 里 issue 07 就是它）
+          <dependency>
+              <groupId>org.springframework.ai</groupId>
+              <artifactId>spring-ai-starter-mcp-client</artifactId>
+          </dependency>
+
+          3) 向量库（对应你 RAG 计划里的 pgvector 选型）
+          <dependency>
+              <groupId>org.springframework.ai</groupId>
+              <artifactId>spring-ai-starter-vector-store-pgvector</artifactId>
+          </dependency>
+
+          4) 本地模型（想不花钱、不联网跑通全流程时用）
+          <dependency>
+              <groupId>org.springframework.ai</groupId>
+              <artifactId>spring-ai-starter-model-ollama</artifactId>
+          </dependency>
+        -->
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+</project>

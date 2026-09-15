@@ -1,0 +1,33 @@
+spring:
+  application:
+    name: spring-ai-demo
+  ai:
+    deepseek:
+      # 只用环境变量注入。绝对不要把真实 key 写进这个文件后再提交到 git。
+      api-key: ${DEEPSEEK_API_KEY:sk-REPLACE-ME}
+      chat:
+        options:
+          # 模型名来自 DeepSeek 官方文档（2026-09），不是博客：
+          #   deepseek-flash    = DeepSeek-V4.1-Flash，便宜、1M 上下文、支持视觉
+          #   deepseek-v4-pro   = DeepSeek-V4-Pro-0813，更强、更贵
+          # 已经退役的名字：deepseek-chat、deepseek-reasoner（别再用）
+          model: ${AI_MODEL:deepseek-flash}
+          temperature: 0.7
+        # 思考模式。DeepSeek 服务端默认是 enabled，这里显式关掉，原因有三：
+        #   1) 思考模式下 temperature 完全无效（官方明确说 "Has no effect in thinking mode"）
+        #   2) 思考模式下 tool_choice=required / 指定具名工具会直接返回 400
+        #   3) 学习/调试阶段更慢更贵，先把主链路跑通更重要
+        # 想打开：把下面改成 enabled，或者设环境变量 AI_THINKING=enabled
+        thinking:
+          type: ${AI_THINKING:disabled}
+        # 思考模式的努力程度：none / low / high / max。
+        # 官方默认 high；Agent 类复杂请求会自动用 max。思考关闭时这一项无意义。
+        # reasoning-effort: high
+
+server:
+  port: 8081
+
+logging:
+  level:
+    # 想看到 Spring AI 实际发出去的 prompt，把下面这行改成 DEBUG
+    org.springframework.ai: DEBUG
