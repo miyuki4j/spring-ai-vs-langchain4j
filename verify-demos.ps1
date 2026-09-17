@@ -1,8 +1,19 @@
-<#
+﻿<#
   验证 spring-ai-demo / langchain4j-demo 的样例端点。
+
+  覆盖 11 条用例：
+      P1-1..3  chat / stream / agent（工具调用）
+      P2-1..3  chat / stream / chat（工具调用）
+      P1-4..6  think / think(思考关) / think/stream —— 思考模式（reasoning_content）对照
+      P2-4..5  think / think/stream
 
   用法（在本目录下）：
       pwsh -File .\verify-demos.ps1
+
+  ⚠️ 本机（2026-09-16 核实）只装了 Windows PowerShell 5.1，没有 pwsh 7。
+  5.1 默认按 GBK 解析无 BOM 的 .ps1，中文注释会把语法读崩（报“缺少右 }”这种假错误），
+  所以本文件保存为 **UTF-8 带 BOM**，并改用：
+      powershell -NoProfile -ExecutionPolicy Bypass -File .\verify-demos.ps1
 
   为什么用 curl.exe 而不是 Invoke-WebRequest：
       1. Windows PowerShell 里 curl 是 Invoke-WebRequest 的别名，要用 curl.exe 才是真 curl
@@ -10,6 +21,11 @@
 #>
 
 $ErrorActionPreference = "Continue"
+
+# curl.exe 吐的是 UTF-8 字节流，而 5.1 默认按控制台代码页（GBK）解码原生命令输出，
+# 结果就是模型回答里的中文全变乱码。这两行把解码/编码都钉成 UTF-8。
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$OutputEncoding = [System.Text.Encoding]::UTF8
 
 $springAiBase = "http://localhost:8081"
 $lc4jBase     = "http://localhost:8082"
@@ -102,6 +118,36 @@ Invoke-Check -Name "P2-2  stream 流式（应看到多行 data:）" `
 Invoke-Check -Name "P2-3  chat   工具调用（期望出现 3214）" `
     -Url "$lc4jBase/api/chat?message=How%20many%20players%20are%20online%20on%20server%20s1%3F" `
     -Expect "3,?214"
+
+# ---------------- 思考模式（reasoning_content）对照：README「下一步」第 4 条 ----------------
+# 判定标准：reasoningChars 是思考内容的字符数，非 0 才说明真的拿到了 reasoning_content。
+
+$thinkMsg = "What%20is%2013%20squared%3F%20Answer%20with%20the%20number%20only."
+
+# P1-4 开思考：Spring AI 能拿到 DeepSeekAssistantMessage.getReasoningContent()
+Invoke-Check -Name "P1-4  think  思考=开（期望 reasoningChars 非 0）" `
+    -Url "$springAiBase/api/chat/think?thinking=true&message=$thinkMsg" `
+    -Expect '"reasoningChars":\s*[1-9]\d*'
+
+# P1-5 关思考：证明「请求层开关」真的生效（这条是 LangChain4j 做不到的）
+Invoke-Check -Name "P1-5  think  思考=关（期望 reasoningChars:0）" `
+    -Url "$springAiBase/api/chat/think?thinking=false&message=$thinkMsg" `
+    -Expect '"reasoningChars":\s*0'
+
+# P1-6 流式思考：R: 是思考分片，C: 是正式回答
+Invoke-Check -Name "P1-6  think/stream 流式思考（期望 R: 分片）" `
+    -Url "$springAiBase/api/chat/think/stream?thinking=true&message=$thinkMsg" `
+    -Expect "data:R:"
+
+# P2-4 非流式思考：AiMessage.thinking()，需要 return-thinking: true
+Invoke-Check -Name "P2-4  think  思考（期望 reasoningChars 非 0）" `
+    -Url "$lc4jBase/api/chat/think?message=$thinkMsg" `
+    -Expect '"reasoningChars":\s*[1-9]\d*'
+
+# P2-5 流式思考：TokenStream.onPartialThinking(...)
+Invoke-Check -Name "P2-5  think/stream 流式思考（期望 R: 分片）" `
+    -Url "$lc4jBase/api/chat/think/stream?message=$thinkMsg" `
+    -Expect "data:R:"
 
 Write-Host ""
 Write-Host "==== 完成 ====" -ForegroundColor Yellow

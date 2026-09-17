@@ -2,6 +2,41 @@ spring:
   application:
     name: spring-ai-demo
   ai:
+    # ============================================================
+    # MCP 客户端（第 6 课）
+    #
+    # 这一段干了什么：告诉 Spring AI「去连一个 MCP server」。
+    # 之后容器里会多出 List<McpSyncClient> 和 SyncMcpToolCallbackProvider，
+    # 业务代码那边的用法和本地 @Tool 完全一样 —— 这正是 MCP 的价值：
+    # 工具从哪来，对上层是透明的。
+    #
+    # ⚠️ 两个必须知道的运行时约束：
+    #
+    #   1) 默认 initialized: true —— 应用启动时就会去连 MCP server 并握手。
+    #      server 没起，P1 会**启动失败**。所以要么先起 mcp-skill-server
+    #      （start-all.ps1 已经把它排在前面），要么用 MCP_ENABLED=false 临时关掉。
+    #      这个"硬依赖"不是缺陷，而是把「工具来自远端」这件事的代价摆到了台面上。
+    #
+    #   2) url 要写到**完整的 endpoint**（带 /mcp）。Streamable HTTP 是单端点协议，
+    #      路径由 server 侧决定；mcp-skill-server 暴露的就是 /mcp。
+    # ============================================================
+    mcp:
+      client:
+        # 不做开关：MCP server 是本应用的硬依赖，连不上就让它起不来。
+        # 一个"查不到工具却照常启动"的服务更危险 —— 模型会以为它没有这个能力。
+        enabled: true
+        name: spring-ai-demo
+        version: 1.0.0
+        # SYNC = 用 McpSyncClient（默认）。ASYNC 对应 McpAsyncClient + WebFlux 风格。
+        type: SYNC
+        streamable-http:
+          connections:
+            # 连接名（skill-server）只是个标识，会出现在日志和工具名前缀里。
+            # 配置成 Map 结构是为了支持同时连多个 MCP server —— 那才是 MCP 的主场：
+            # 一个 agent 挂三五个 server，工具清单在运行时合并。
+            skill-server:
+              url: ${MCP_SKILL_URL:http://localhost:8099/mcp}
+
     deepseek:
       # 只用环境变量注入。绝对不要把真实 key 写进这个文件后再提交到 git。
       api-key: ${DEEPSEEK_API_KEY:sk-REPLACE-ME}

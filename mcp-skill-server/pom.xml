@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <!--
+      ===== MCP Server（第 6 课）=====
+
+      这是本项目里第一个「不接大模型」的模块 —— 它只提供一个 MCP 服务端。
+
+      为什么单独成一个模块、单独起一个进程？
+
+        因为 MCP 的价值恰恰在于「工具不再属于某个框架」。
+        如果把它塞进 spring-ai-demo 里，LangChain4j 那一侧来连的时候，
+        你分不清究竟是在"跨框架调用工具"还是"在调 Spring AI 的接口"。
+        独立成进程之后，两个客户端（P1 Spring AI / P2 LangChain4j）是平等的，
+        谁也不知道 server 是用什么写的 —— 这正是协议的价值。
+
+      它和 P1 同为 Spring Boot 4.1.1，只是方便复用同一套依赖版本；
+      换成一个纯 Python/Node 写的 MCP server 也完全可以把下面两个客户端接上。
+    -->
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>4.1.1</version>
+        <relativePath/>
+    </parent>
+
+    <groupId>com.example</groupId>
+    <artifactId>mcp-skill-server</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <name>mcp-skill-server</name>
+    <description>技能配置查询 MCP Server（Spring AI 2.0.1 / Streamable HTTP）</description>
+
+    <properties>
+        <java.version>17</java.version>
+        <spring-ai.version>2.0.1</spring-ai.version>
+    </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.springframework.ai</groupId>
+                <artifactId>spring-ai-bom</artifactId>
+                <version>${spring-ai.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <dependencies>
+        <!--
+          MCP 服务端 starter（webmvc 版）。
+
+          三个变体的区别（Maven Central 上确认真实存在）：
+            spring-ai-starter-mcp-server          → stdio（配 stdio=true）
+            spring-ai-starter-mcp-server-webmvc   → Streamable HTTP / SSE，Servlet 栈  ← 本模块用这个
+            spring-ai-starter-mcp-server-webflux  → Streamable HTTP / SSE，Reactive 栈
+
+          它传递依赖 spring-ai-mcp + spring-ai-mcp-annotations + mcp-spring-webmvc，
+          而 spring-ai-mcp:2.0.1 内部依赖官方 SDK io.modelcontextprotocol.sdk:mcp:2.0.0
+          —— 这个版本号后面在「协议互通」那一节会用到。
+        -->
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-starter-mcp-server-webmvc</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+</project>

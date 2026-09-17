@@ -74,16 +74,66 @@
         </dependency>
 
         <!--
+          ===== 多轮对话记忆（第 5 课）=====
+
+          只加这一行，容器里就会多出两个 Bean —— 这是 Spring AI 和 LangChain4j 在
+          「装配成本」上最直接的差距（LangChain4j 那边没有任何记忆自动配置，必须手写）。
+
+          这两个 Bean 由 spring-ai-autoconfigure-model-chat-memory:2.0.1 的
+          ChatMemoryAutoConfiguration 提供（javap 实证，该类只有两个方法）：
+              ChatMemoryRepository chatMemoryRepository()   -> new InMemoryChatMemoryRepository()
+              ChatMemory chatMemory(ChatMemoryRepository)   -> MessageWindowChatMemory.builder()
+                                                                  .chatMemoryRepository(repo).build()
+
+          注意后者的字节码里**没有调用 .maxMessages(...)** —— 所以窗口大小走的是
+          MessageWindowChatMemory 内部的 DEFAULT_MAX_MESSAGES = 20（同样是 javap 从常量池
+          里读出来的），而且这个模块里没有 ChatMemoryProperties，也就是说
+          **窗口大小在 2.0.1 里没有配置项可以改**。想换尺寸只有一个办法：
+          自己声明一个 ChatMemory Bean 把自动配置覆盖掉（MemoryConfig 里有示范）。
+
+          生产上把 InMemory 换成 Redis 也只是换这一行（对应下面的 redis starter）。
+          ——你 GRC 里那套 Redis key/序列化/过期策略正好能直接复用。
+        -->
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-starter-model-chat-memory</artifactId>
+        </dependency>
+
+        <!--
+          ===== MCP 客户端（第 6 课）=====
+
+          只加这一行，容器里就会多出两样东西：
+              List<McpSyncClient>           —— 连到配置里每个 MCP server 的客户端
+              SyncMcpToolCallbackProvider   —— 把它们包装成 Spring AI 认识的 ToolCallbackProvider
+
+          工具的来源从此变了：不再是「进程内的 Java Bean」，而是
+          「远端 MCP server 报上来的清单」。tools/list 是运行时查的，
+          连你都不必事先知道对面有哪些工具。
+
+          选型注意：本 starter 传递依赖的是 spring-ai-autoconfigure-mcp-client-httpclient，
+          走 JDK 自带 HttpClient，**不引入 WebFlux**，所以能和 webmvc 和平共处。
+          换成 spring-ai-starter-mcp-client-webflux 则会把整个 Reactive 栈拖进来。
+
+          对照 LangChain4j：那边 MCP 模块（langchain4j-mcp）连 1.20.0 正式版都没跟上
+          （只有 1.20.0-beta30），而且**没有对应的 Spring Boot starter**——
+          McpClient / McpToolProvider 两个 Bean 必须手写。装配成本差在 MCP 上比在记忆上更明显。
+        -->
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-starter-mcp-client</artifactId>
+        </dependency>
+
+        <!--
           ===== 下面这些按学习进度逐个打开（都在 spring-ai-bom 2.0.1 里，去掉注释即可）=====
 
-          1) 多轮对话记忆（你的 16 周计划里"对话状态管理"用得上）
-          <dependency>
-              <groupId>org.springframework.ai</groupId>
-              <artifactId>spring-ai-starter-model-chat-memory</artifactId>
-          </dependency>
+          1) 记忆的持久化实现（BOM 里现成的有 jdbc / redis / cassandra / mongodb / neo4j 五种）
           <dependency>
               <groupId>org.springframework.ai</groupId>
               <artifactId>spring-ai-starter-model-chat-memory-repository-jdbc</artifactId>
+          </dependency>
+          <dependency>
+              <groupId>org.springframework.ai</groupId>
+              <artifactId>spring-ai-starter-model-chat-memory-repository-redis</artifactId>
           </dependency>
 
           2) MCP（2026 年最硬的关键词；你的 spec 里 issue 07 就是它）

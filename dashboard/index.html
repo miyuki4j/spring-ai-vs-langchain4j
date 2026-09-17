@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI4J 对照台 · Spring AI vs LangChain4j</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="top">
+  <div class="top-left">
+    <h1>AI4J 对照台</h1>
+    <p class="top-sub">同一道题同时打两个框架 —— 把「跑通了」变成「看得见差异」</p>
+  </div>
+  <div class="top-right">
+    <div class="svc" id="svc-p1"><span class="svc-dot"></span><span class="svc-text">未探测</span></div>
+    <div class="svc" id="svc-p2"><span class="svc-dot"></span><span class="svc-text">未探测</span></div>
+    <div class="svc" id="svc-mcp" title="第三个进程：只提供工具，不含大模型"><span class="svc-dot"></span><span class="svc-text">未探测</span></div>
+    <button class="btn ghost sm" id="btn-health">重新探测</button>
+    <button class="btn ghost sm" id="btn-demo" title="不打后端，用本地合成响应走一遍同样的渲染路径">演示模式</button>
+  </div>
+</header>
+
+<nav class="tabs">
+  <button class="tab is-on" data-panel="qa">问答与工具调用</button>
+  <button class="tab" data-panel="stream">流式输出</button>
+  <button class="tab" data-panel="think">思考模式</button>
+  <button class="tab" data-panel="memory">对话记忆</button>
+  <button class="tab" data-panel="mcp">MCP 远程工具</button>
+  <button class="tab" data-panel="ref">端点与结论</button>
+</nav>
+
+<main>
+
+<!-- ================= 页签 1：问答与工具调用 ================= -->
+<section class="panel is-on" id="panel-qa">
+  <div class="bar">
+    <label class="field grow">
+      <span class="field-label">问题</span>
+      <input type="text" id="qa-q" value="s1 区服现在有多少玩家在线？">
+    </label>
+    <button class="btn primary" id="qa-go">同时发送</button>
+  </div>
+  <div class="presets">
+    <span class="presets-label">预设</span>
+    <button class="chip" data-fill="qa-q" data-val="s1 区服现在有多少玩家在线？">查在线人数（触发工具）</button>
+    <button class="chip" data-fill="qa-q" data-val="1.4.2 版本的热更状态是什么？">查热更状态（触发工具）</button>
+    <button class="chip" data-fill="qa-q" data-val="用三句话说明 Redis 为什么快。">纯问答（不触发工具）</button>
+  </div>
+  <p class="note">
+    <b>端点映射</b>：Spring AI 用独立的 <code>/api/chat/agent</code>；LangChain4j 的工具是声明式绑在
+    <code>@AiService</code> 上的，直接问 <code>/api/chat</code> 就会触发。
+    <b>怎么判断工具真的被调用了</b>：<code>GameServerTools</code> 里写死的在线人数是 3214 / 1870 / 542，
+    模型不可能凭空知道，回答里出现这些数字就说明「模型决定调工具 → 后端执行 → 结果回灌」这条闭环通了。
+  </p>
+  <div class="compare">
+    <article class="side p1" id="qa-p1"></article>
+    <article class="side p2" id="qa-p2"></article>
+  </div>
+</section>
+
+<!-- ================= 页签 2：流式输出 ================= -->
+<section class="panel" id="panel-stream">
+  <div class="bar">
+    <label class="field grow">
+      <span class="field-label">问题</span>
+      <input type="text" id="st-q" value="从 1 数到 10，每行一个数字，不要多余解释。">
+    </label>
+    <button class="btn primary" id="st-go">同时发送</button>
+  </div>
+  <div class="presets">
+    <span class="presets-label">预设</span>
+    <button class="chip" data-fill="st-q" data-val="从 1 数到 10，每行一个数字，不要多余解释。">数数字（看逐字节奏）</button>
+    <button class="chip" data-fill="st-q" data-val="用五句话说明 JVM 的分代回收。">较长的回答</button>
+    <button class="chip" data-fill="st-q" data-val="s1 区服现在有多少玩家在线？">带工具调用（见下方提示）</button>
+  </div>
+  <p class="note">
+    计时口径：<b>首字延迟</b>＝从发出请求到收到第一个数据帧；<b>总耗时</b>＝到流结束。
+    两条时间轴用<b>同一刻度</b>归一化，所以长度可以直接横向对读。
+  </p>
+  <p class="note warn" id="st-warn">
+    <b>一处不公平要说清楚</b>：Spring AI 侧 <code>application.yml</code> 里 <code>thinking.type=disabled</code>，
+    所以它的流式是「关思考」的；而 DeepSeek 服务端默认<b>开</b>思考，LangChain4j 的流式因此照样会生成思考内容、
+    照样计费 —— 只是这个端点只接了 <code>onPartialResponse</code>，把思考内容丢掉了。
+    要公平对比首字延迟，两边其实不在同一起跑线。
+  </p>
+  <div class="compare">
+    <article class="side p1" id="st-p1"></article>
+    <article class="side p2" id="st-p2"></article>
+  </div>
+</section>
+
+<!-- ================= 页签 3：思考模式 ================= -->
+<section class="panel" id="panel-think">
+  <div class="bar">
+    <label class="field grow">
+      <span class="field-label">问题</span>
+      <input type="text" id="tk-q" value="13 的平方是多少？只回答数字。">
+    </label>
+    <button class="btn primary" id="tk-go">同时发送</button>
+  </div>
+  <div class="presets">
+    <span class="presets-label">预设</span>
+    <button class="chip" data-fill="tk-q" data-val="13 的平方是多少？只回答数字。">短问题（省 token）</button>
+    <button class="chip" data-fill="tk-q" data-val="一个区服有 3214 个在线玩家，每人每小时产生 40 条日志，一天多少条？只回答数字。">需要推理的计算</button>
+    <button class="chip" data-fill="tk-q" data-val="用一句话说明为什么思考模式更贵。">需要解释的问题</button>
+  </div>
+  <div class="switchbar">
+    <span class="switchbar-label">Spring AI 侧思考开关</span>
+    <label class="radio"><input type="radio" name="tk-thinking" value="true" checked><span>开</span></label>
+    <label class="radio"><input type="radio" name="tk-thinking" value="false"><span>关</span></label>
+    <span class="switchbar-hint">LangChain4j 侧<b>没有</b>这个开关 —— 它的 OpenAI 兼容模块根本不发 <code>thinking</code> 字段</span>
+  </div>
+  <p class="note">
+    <b>先看这个开关</b>：把它从「开」切到「关」再发一次，同一道题的 token 消耗会明显下降，
+    而 LangChain4j 侧无论如何都降不下来 —— 这就是两侧差异的实证，也是页面上最值得投屏的一屏。
+  </p>
+  <div class="compare">
+    <article class="side p1" id="tk-p1"></article>
+    <article class="side p2" id="tk-p2"></article>
+  </div>
+  <div class="card" id="tk-cost">
+    <h3 class="card-title">同一道题的 token 成本对照</h3>
+    <div id="tk-cost-body"><p class="muted">跑一次上面的对照，这里会画出两侧的 token 条形图。</p></div>
+  </div>
+</section>
+
+<!-- ================= 页签 4：对话记忆 ================= -->
+<section class="panel" id="panel-memory">
+  <div class="bar">
+    <label class="field">
+      <span class="field-label">会话 ID</span>
+      <input type="text" id="mm-cid" value="demo-a" class="w-sm">
+    </label>
+    <label class="field">
+      <span class="field-label">记忆窗口</span>
+      <select id="mm-window" class="sel">
+        <option value="">默认 20 条 = 10 轮</option>
+        <option value="6">6 条 = 3 轮</option>
+        <option value="2">2 条 = 1 轮（看裁剪）</option>
+      </select>
+    </label>
+    <button class="btn primary" id="mm-go">跑四轮对话</button>
+  </div>
+  <div class="presets">
+    <span class="presets-label">预设会话</span>
+    <button class="chip" data-fill="mm-cid" data-val="demo-a">demo-a</button>
+    <button class="chip" data-fill="mm-cid" data-val="demo-b">demo-b（换个槽位）</button>
+  </div>
+  <p class="note">
+    <b>这页在验什么</b>：一趟请求里连跑四轮 —— 第 1、3 轮用工具查在线人数，第 2 轮让模型
+    「记住热更批次号 <code>LOONG-7749</code>」，第 4 轮让它复述。<br>
+    <b>判定记忆是否生效，只看这一个值</b>：<code>LOONG-7749</code>。
+    因为工具<b>产不出</b>它，而另外两个数字（3214 / 1870）模型在回忆轮完全可以自己再调一次
+    工具查回来 —— 实测就真发生过。所以那两个只能当参考，<b>不能当记忆的证据</b>。<br>
+    同时还会拿第 4 轮的问题在一个<b>全新的会话</b>上再问一次当对照组：
+    「有记忆说出锚点 + 无记忆说不出锚点」同时成立，实验才封闭。<br>
+    <b>中间那部分</b>是每轮送进去的历史条数和 prompt token 的增长曲线。
+    注意曲线<b>不是</b>单调上升的：触发工具的那一轮会回灌工具定义和工具结果，
+    一次多出四五百 token，比几条历史消息大得多 —— 所以「prompt 逐轮涨」这个直觉是错的，
+    真正的记忆开销要看下面那张表里的<b>受控对照</b>（同题、同工具、只差历史）。<br>
+    把「记忆窗口」切到 <b>2 条</b>再跑一次：最早那条 user 消息会被挤掉，
+    锚点复述不出来。两侧裁出来的东西还<b>不一样</b> —— 这块对比很值得细看。
+  </p>
+  <div class="compare">
+    <article class="side p1" id="mm-p1"></article>
+    <article class="side p2" id="mm-p2"></article>
+  </div>
+  <div class="card">
+    <h3 class="card-title">记忆条数与 prompt token 的逐轮增长</h3>
+    <div id="mm-chart"><p class="muted">跑一次上面的对比，这里会画出两侧的增长曲线（共用同一刻度，所以可以直接比高矮）。</p></div>
+  </div>
+  <div class="card">
+    <h3 class="card-title">实验结论</h3>
+    <div id="mm-verdict"><p class="muted">等待数据。</p></div>
+  </div>
+</section>
+
+<!-- ================= 页签 5：MCP 远程工具 ================= -->
+<section class="panel" id="panel-mcp">
+  <div class="bar">
+    <label class="field grow">
+      <span class="field-label">问题</span>
+      <input type="text" id="mc-q" value="技能 9001 叫什么名字？它作用于什么目标类型？">
+    </label>
+    <button class="btn primary" id="mc-go">跑实验组 + 对照组</button>
+  </div>
+  <div class="presets">
+    <span class="presets-label">预设</span>
+    <button class="chip" data-fill="mc-q" data-val="技能 9001 叫什么名字？它作用于什么目标类型？">锚点问题（默认）</button>
+    <button class="chip" data-fill="mc-q" data-val="你一共能查到哪些技能？只列 id 和名字。">列出全部技能</button>
+    <button class="chip" data-fill="mc-q" data-val="条件属性 TURN_INDEX 是什么意思？">查条件属性</button>
+  </div>
+  <p class="note">
+    <b>这一页在验什么</b>：两个后端的工具现在有<b>两个来源</b> —— 进程内的
+    <code>GameServerTools</code>（<code>@Tool</code> 方法），以及<b>第三个进程</b>
+    <code>mcp-skill-server</code>（:8099）通过 MCP 协议提供的 4 个技能查询工具。<br>
+    <b>锚点是</b>：技能 <code>9001「龙血·磐石」/ 目标类型 REVEALED_AREA</code>。
+    它<b>只存在于 mcp-skill-server 的 skills.json 里</b>，两个后端的代码里一个字都没有 ——
+    所以模型不可能凭记忆答出来。<br>
+    <b>怎么判定 MCP 真的生效</b>：同一道题跑两次，唯一变量是「挂不挂 MCP 工具」。
+    挂上必须答出锚点，不挂必须答不出。一真一假，实验才封闭 ——
+    只测「挂上答对了」是不够的（可能是信息泄漏，也可能只是蒙对）。<br>
+    <b>上面那张三方清单</b>才是 MCP 最本质的证据：裸协议 / Spring AI / LangChain4j
+    三个视角看到的工具清单必须<b>逐项相同</b>，而这份清单它们<b>在编译期都不知道</b> ——
+    纯粹是运行时问回来的。这一点「框架自带的 tool calling」永远做不到。<br>
+    ⚠️ 这一页需要<b>第三个进程</b>先起来（<code>mcp-skill-server</code>，8099）。
+    两个后端启动时就会去拉它的工具清单，所以它必须先进就绪态 —— 用
+    <code>start-all.ps1</code> 会按正确顺序起。
+  </p>
+
+  <div class="card">
+    <h3 class="card-title">三方工具清单 —— 谁也「编译期不知道」这份能力清单</h3>
+    <div id="mc-tools"><p class="muted">点上面的按钮，三列会各自去问一次「你有哪些工具」。</p></div>
+  </div>
+
+  <div class="compare">
+    <article class="side p1" id="mc-p1"></article>
+    <article class="side p2" id="mc-p2"></article>
+  </div>
+
+  <div class="card">
+    <h3 class="card-title">实验结论</h3>
+    <div id="mc-verdict"><p class="muted">等待数据。</p></div>
+  </div>
+</section>
+
+<!-- ================= 页签 6：端点与结论 ================= -->
+<section class="panel" id="panel-ref">
+  <div class="card">
+    <h3 class="card-title">端点速查</h3>
+    <table class="tbl" id="ref-endpoints">
+      <thead>
+        <tr><th>能力</th><th>Spring AI（8081）</th><th>LangChain4j（8082）</th><th>说明</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>基础问答</td>
+          <td><code>/api/chat?message=</code></td>
+          <td><code>/api/chat?message=</code></td>
+          <td>LangChain4j 侧自带工具能力</td>
+        </tr>
+        <tr>
+          <td>流式输出</td>
+          <td><code>/api/chat/stream</code></td>
+          <td><code>/api/chat/stream</code></td>
+          <td>前者返回 <code>Flux&lt;String&gt;</code>，后者是 <code>TokenStream</code> 回调桥接 <code>SseEmitter</code></td>
+        </tr>
+        <tr>
+          <td>工具调用</td>
+          <td><code>/api/chat/agent</code></td>
+          <td>同 <code>/api/chat</code></td>
+          <td>Spring AI 显式传 <code>.tools(obj)</code>；LangChain4j <code>@AiService</code> 自动装配</td>
+        </tr>
+        <tr>
+          <td>思考模式</td>
+          <td><code>/api/chat/think</code></td>
+          <td><code>/api/chat/think</code></td>
+          <td>返回 <code>answer / reasoningContent / reasoningChars / tokens</code>，字段两侧对齐</td>
+        </tr>
+        <tr>
+          <td>流式思考</td>
+          <td><code>/api/chat/think/stream</code></td>
+          <td><code>/api/chat/think/stream</code></td>
+          <td>帧前缀 <code>R:</code> 是思考、<code>C:</code> 是正式回答</td>
+        </tr>
+        <tr>
+          <td>对话记忆</td>
+          <td><code>/api/chat/memory</code></td>
+          <td><code>/api/chat/memory</code></td>
+          <td>四轮连跑 + 无记忆对照。可传 <code>conversationId</code> / <code>maxMessages</code> / <code>control</code></td>
+        </tr>
+        <tr>
+          <td>MCP 工具清单</td>
+          <td><code>/api/chat/mcp/tools</code></td>
+          <td><code>/api/chat/mcp/tools</code></td>
+          <td>每次真的去问远端 MCP server 要 <code>tools/list</code> —— 这份清单谁也<b>不在编译期知道</b></td>
+        </tr>
+        <tr>
+          <td>MCP 问答（实验/对照）</td>
+          <td><code>/api/chat/mcp?message=&amp;withMcp=</code></td>
+          <td><code>/api/chat/mcp?message=&amp;withMcp=</code></td>
+          <td><code>withMcp=false</code> 是<b>对照组</b>：只挂本地工具，不挂 MCP。两边返回体逐字段对齐</td>
+        </tr>
+        <tr>
+          <td>探活 + 配置</td>
+          <td><code>/api/health</code></td>
+          <td><code>/api/health</code></td>
+          <td>只读本地配置，不调模型、不花钱</td>
+        </tr>
+      </tbody>
+    </table>
+    <p class="hint" style="margin-top:10px">
+      MCP 那一对端点需要<b>第三个进程</b>先起来：<code>mcp-skill-server</code>（<code>http://localhost:8099/mcp</code>）。
+      它不含大模型、也不依赖任何 AI 框架 —— 两个后端启动时就会去拉它的工具清单，所以它必须先进就绪态。
+    </p>
+  </div>
+
+  <div class="card">
+    <h3 class="card-title">实测结论</h3>
+    <ol class="findings">
+      <li>
+        <b>LangChain4j 拿得到 <code>reasoning_content</code>。</b>
+        路径是 <code>ChatResponse.aiMessage().thinking()</code>，前置条件是
+        <code>return-thinking: true</code>。它的 <code>thinkingFieldName</code> 默认值就是
+        <code>"reasoning_content"</code>，源码注释点名 <i>"This setting is intended for DeepSeek"</i>。
+        <span class="tag tag-fix">旧结论作废</span>
+      </li>
+      <li>
+        <b>DeepSeek 服务端默认就开思考。</b>
+        请求体完全不传 <code>thinking</code> 字段时，照样返回 <code>reasoning_content</code>，也照样计费。
+        所以「不配开关」不等于「不花钱」。
+      </li>
+      <li>
+        <b>真正的差异是「能不能主动关」。</b>
+        Spring AI 有配置层（<code>thinking.type</code>）和请求层（<code>enableThinking()</code> / <code>disableThinking()</code>）
+        两个开关；LangChain4j 的 OpenAI 兼容模块<b>根本不发</b> <code>thinking</code> 字段，
+        只能绕道 OpenAI 的 <code>reasoning_effort</code>（实测 <code>none</code> 等效关思考）。
+        <span class="tag tag-key">核心差异</span>
+      </li>
+      <li>
+        <b><code>@AiService</code> 的返回类型有个坑：别写 <code>ChatResponse</code>。</b>
+        <code>AiServiceValidation.SUPPORTED_RETURN_TYPES</code> 确实把它列为合法类型，但那个集合
+        <b>只用于校验放行，不决定运行时行为</b>。真正起作用的是
+        <code>ServiceOutputParser.schemaNotRequired(...)</code>，白名单为
+        <code>String / AiMessage / TokenStream / Response / Map / void / Void</code> ——
+        <code>ChatResponse</code> 不在其中，框架于是给模型下达「必须按这个 JSON schema 回答」，
+        模型就编了一个假的 <code>ChatResponse</code> 回来（连 <code>modelName:"gpt-4o"</code> 都是编的）。
+        <span class="tag tag-warn">踩过的坑</span>
+      </li>
+      <li>
+        <b>要连 token 用量一起拿，用 <code>Result&lt;AiMessage&gt;</code>。</b>
+        它同样不在上面那个白名单里，但 <code>DefaultAiServices</code> 给它开了专门分支
+        （源码第 353 行 <code>isReturnTypeResult</code>），所以安全。
+        这条说明「白名单不是判断安全的唯一依据，还要看有没有专门分支」。
+      </li>
+      <li>
+        <b>思考模式的成本差是实打实的。</b>
+        同一道题，Spring AI 侧思考开 vs 关，总 token 从 78 降到 35（约省 55%）。
+      </li>
+      <li>
+        <b>对话记忆的差距不在功能，在<b>抽象切分</b>和<b>装配成本</b>。</b>
+        同样是 <code>ChatMemory</code> 这个名字：Spring AI 指的是<b>会话管理器</b>（每个方法都带
+        <code>conversationId</code>），LangChain4j 指的是<b>某一个会话</b>（身份在 <code>id()</code> 上，
+        多会话靠外层 <code>ChatMemoryProvider</code> 分槽）。装配上，Spring AI 引进依赖就有
+        <code>ChatMemory</code> + <code>ChatMemoryRepository</code> 两个 Bean；
+        LangChain4j 的 starter 里<b>一个记忆自动配置都没有</b>，Store 和 Provider 全得手写。
+        <span class="tag tag-key">核心差异</span>
+      </li>
+      <li>
+        <b>记忆挂载的时机也不一样：一个在请求上，一个在接口上。</b>
+        Spring AI 是 <code>.advisors(a -&gt; a.param(ChatMemory.CONVERSATION_ID, cid))</code> ——
+        运行期参数，同一个 <code>ChatClient</code> 每次调用想换就换；
+        LangChain4j 是 <code>@MemoryId String memoryId</code> —— 编译期契约，
+        接口一旦这么声明，这个方法<b>永远</b>带记忆、调用方管不着。
+        连「换个窗口」都做不到：框架在 <code>ChatMemoryService</code> 里用
+        <code>computeIfAbsent</code> 缓存了每个 memoryId 的 <code>ChatMemory</code> 实例，
+        改 Provider 不会重建它，只能绕开 <code>@AiService</code> 走
+        <code>AiServices.builder()</code> 现场构造。
+      </li>
+      <li>
+        <b>LangChain4j 的记忆装配有<b>三种</b>失败模式，方向各不相同。</b>
+        <span class="tag tag-warn">踩过的坑</span><br>
+        ① 用了 <code>@MemoryId</code> 但没配 <code>ChatMemoryProvider</code> → 启动即抛
+        <code>IllegalConfigurationException</code>；<br>
+        ② 配了 Provider 但<b>忘了写 <code>@MemoryId</code></b> → 没有任何校验，静默不走记忆；<br>
+        ③ 声明了<b>两个</b>同类型 Bean → 启动抛冲突异常，提示改用
+        <code>@AiService(wiringMode = EXPLICIT, chatMemoryProvider = "…")</code>。<br>
+        这三种都出自 <code>AiServicesAutoConfig#addBeanReference</code> 和
+        <code>AiServiceValidation#validateMethod</code> 的字节码，不是猜的。
+      </li>
+      <li>
+        <b>「忘写 <code>@MemoryId</code> 就静默不生效」这条靠实测兜住。</b>
+        本项目里 <code>chat</code> / <code>chatStream</code> / <code>chatWithThinking</code> 都没写
+        <code>@MemoryId</code>，共享同一个 Provider 却不走记忆 ——
+        校验是单向的（只查「有注解没 Provider」），所以只能靠回归测试确认它们没被带崩。
+        <span class="tag tag-fix">已加回归</span>
+      </li>
+      <li>
+        <b>MCP 与「框架自带 tool calling」的分水岭：工具清单是<b>运行时问来的</b>。</b>
+        前五课的工具都是进程内的 Java 方法（反射扫 <code>@Tool</code>），换个框架就没了。
+        MCP 把工具挪到协议上：<code>mcp-skill-server</code>（<b>第三个进程，不含大模型、不依赖任何 AI 框架</b>）
+        通过 <code>tools/list</code> 报能力。实测一个<b>裸 Python 脚本</b>（纯 <code>urllib</code> 说 JSON-RPC）、
+        P1、P2 三方报出来的清单<b>逐项相同</b>，而这份清单<b>客户端编译期完全不知道</b>。
+        <span class="tag tag-key">核心差异</span>
+      </li>
+      <li>
+        <b>装配成本第三次「同题对照」，结论稳定：一边改 yml，一边手写 Bean。</b>
+        流式（<code>Flux</code> vs <code>TokenStream</code>）→ 记忆（白送两个 Bean vs 全手写）
+        → MCP（<code>application.yml</code> 加 6 行 vs 手写 <code>McpClient</code> + <code>McpToolProvider</code>）。
+        连依赖版本都差着：LangChain4j 的 <code>langchain4j-mcp</code> <b>只有 <code>-beta</code> 版</b>
+        （<code>1.20.0</code> 正式版 404），而且<b>没有 Spring Boot starter</b>。
+        但两边的<b>业务代码都是 0 行改动</b> —— MCP 是装配期接进来的。
+      </li>
+      <li>
+        <b>⚠️ 假通过比假失败危险：记忆串槽让对照组"抄"到了答案。</b>
+        <span class="tag tag-warn">踩过的坑</span><br>
+        P2 的对照组（不挂 MCP）居然答对了锚点，看起来像「锚点无效，实验作废」。
+        查证据链才发现：MCP server 侧 <code>tools/call</code> 计数只有 2（两侧实验组各一次），
+        对照组<b>根本没调 MCP</b>；但它的请求体里带着<b>上一轮实验组的完整问答</b>，于是把答案复述了一遍。<br>
+        根因两条叠加：① <code>chatWithTools</code> 没有 <code>@MemoryId</code>，被分配了默认记忆槽；
+        ② 实验组和对照组<b>共用同一个 <code>ChatMemoryProvider</code></b>，落到同一个槽。<br>
+        结论：<b>记忆的边界不在服务实例上，在 Provider 和 id 上</b> —— 和上面
+        <code>computeIfAbsent</code> 缓存那条是同一类问题的两面。
+        修法是两道保险：方法加 <code>@MemoryId</code> + 每次随机 <code>sessionId</code>，
+        对照组再用自己 <code>new</code> 的 <code>InMemoryChatMemoryStore</code>。
+      </li>
+      <li>
+        <b>协议版本上限由服务端定，是 <code>2025-11-25</code>。</b>
+        LangChain4j 1.20.0-beta30 的 <code>DefaultMcpClient</code> 会先探测现代协议
+        <code>server/discover</code>（<code>2026-07-28</code>），失败才回落到
+        <code>initialize</code>。实测两个客户端请求的都是 <code>2025-11-25</code> ——
+        而这<b>恰是该 server 支持的版本上限</b>（用裸协议逐个版本试：≤ 上限就原样回显，
+        更高或未知才推行 <code>2025-11-25</code>）。
+        所以不是服务端把客户端"降级"，是两边正好在服务端的天花板上握手；
+        现代协议那条路确实走不通（<code>server/discover</code> 无会话时被 <code>-32601</code> 挡下、
+        带会话则挂起不应答）。这种事只看日志看不出来，只有抓包才露。
+      </li>
+    </ol>
+  </div>
+
+  <div class="card">
+    <h3 class="card-title">两个后端当前实际生效的配置</h3>
+    <p class="muted">数据来自各自的 <code>/api/health</code>。注意这里读的是 Spring 的 <code>Environment</code>，
+      也就是所有配置来源合并后的最终值 —— 环境变量对 yml 的覆盖会在这里露出来。</p>
+    <div class="cfg-grid">
+      <div class="cfg-col p1" id="ref-cfg-p1"><p class="muted">未获取</p></div>
+      <div class="cfg-col p2" id="ref-cfg-p2"><p class="muted">未获取</p></div>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer class="foot">
+  <span>Spring AI 2.0.1 / Boot 4.1.1（8081）</span>
+  <span class="sep">·</span>
+  <span>LangChain4j 1.20.0 / Boot 3.5.16（8082）</span>
+  <span class="sep">·</span>
+  <span>MCP server（8099，工具提供方）</span>
+  <span class="sep">·</span>
+  <span id="foot-note">对照台是独立静态页，两个后端需各自开放 CORS</span>
+</footer>
+
+<script src="app.js"></script>
+</body>
+</html>

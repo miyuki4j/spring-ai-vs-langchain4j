@@ -1,0 +1,39 @@
+server:
+  port: 8099
+
+spring:
+  application:
+    name: mcp-skill-server
+
+  ai:
+    mcp:
+      server:
+        # 服务标识：客户端握手时能读到，用来在日志/列表里区分是哪个 MCP server
+        name: skill-config-server
+        version: 1.0.0
+
+        # 传输协议。三个可选值（枚举 ServerProtocol，源码确认）：
+        #   STREAMABLE —— 默认值。MCP 现行标准传输，单端点 + 按需升级为 SSE 流
+        #   SSE        —— 旧方案，需要 /sse + /mcp/message 两个端点，已不推荐新项目用
+        #   STATELESS  —— 无会话状态版，适合 Serverless 部署
+        # 这里显式写出来，是为了让「我们是靠哪一种传输互通」这件事在配置里可见 ——
+        # 客户端那一侧必须配对（见两侧的 client 配置）。
+        protocol: STREAMABLE
+
+        # server 自述，客户端握手时会拿到，通常会注入到模型的上下文里，
+        # 相当于「这个工具集是干什么用的」的全局说明。
+        instructions: |
+          本服务提供卡牌游戏「技能配置」的只读查询能力，共 4 个工具：
+            list_skills            列出/筛选技能
+            get_skill              按 ID 查技能完整配置
+            explain_effect_target  解释效果目标类型（EffectTargetType）的含义
+            validate_condition     校验技能条件表达式是否合法
+          当用户问到技能 ID、技能名称、技能效果、伤害目标、触发条件时，请优先使用这些工具，
+          不要凭记忆回答 —— 技能配置会随版本调整。
+
+logging:
+  level:
+    # 想看 MCP 的 JSON-RPC 往返（initialize / tools/list / tools/call）就打开这两行。
+    # 排「客户端连不上」「工具列表为空」这类问题时，这个日志是第一现场。
+    io.modelcontextprotocol: DEBUG
+    org.springframework.ai.mcp: DEBUG

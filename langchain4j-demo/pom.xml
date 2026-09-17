@@ -40,6 +40,14 @@
         <java.version>17</java.version>
         <!-- 核心模块 1.20.0；starter 类模块由 BOM 解析到 1.20.0-beta30 -->
         <langchain4j.version>1.20.0</langchain4j.version>
+        <!--
+          MCP 模块必须单独钉版本，原因值得记一笔：
+          langchain4j-mcp **没有** 1.20.0 正式版（Maven Central 上是 404），
+          它只发到 1.20.0-beta30。所以哪怕 BOM 升到了 1.20.0，
+          这个模块也得写明 beta30，否则解析不到。
+          这正是「一个子模块没跟上主线节奏」的典型后果。
+        -->
+        <langchain4j-mcp.version>1.20.0-beta30</langchain4j-mcp.version>
     </properties>
 
     <dependencyManagement>
@@ -75,6 +83,27 @@
         <dependency>
             <groupId>dev.langchain4j</groupId>
             <artifactId>langchain4j-open-ai-spring-boot-starter</artifactId>
+        </dependency>
+
+        <!--
+          ===== MCP 客户端（第 6 课）=====
+
+          只有这一个模块，而且**没有 Spring Boot starter** ——
+          dev.langchain4j 下与 MCP 相关的 artifact 一共就四个
+          （langchain4j-mcp / langchain4j-community-mcp-server / langchain4j-agentic-mcp / langchain4j-mcp-docker），
+          全都不是 starter。所以客户端那三个对象（Transport / McpClient / McpToolProvider）
+          必须自己 new 出来，见 config/McpClientConfig.java。
+
+          对照 Spring AI：那边一个 spring-ai-starter-mcp-client 就把
+          McpSyncClient 列表和 SyncMcpToolCallbackProvider 全自动配好了。
+          这是两个框架在「装配成本」上的第三次同题对照
+          （第一次是记忆、第二次是模型，这次是 MCP），结论一致：
+          **Spring AI 走 Spring Boot 原生自动配置，LangChain4j 更偏「库」的形态。**
+        -->
+        <dependency>
+            <groupId>dev.langchain4j</groupId>
+            <artifactId>langchain4j-mcp</artifactId>
+            <version>${langchain4j-mcp.version}</version>
         </dependency>
 
         <dependency>

@@ -1,0 +1,137 @@
+{
+  "version": "2026-09-17",
+  "comment": "示例数据。字段结构参照卡牌游戏技能配置（效果目标类型 + 条件表达式），可整体替换成你的真实配置，代码不用改。",
+  "anchorSkillId": 9001,
+  "targetTypes": [
+    { "code": 1,  "name": "SELF",           "desc": "自身" },
+    { "code": 2,  "name": "SINGLE_ENEMY",   "desc": "单个敌方单位" },
+    { "code": 3,  "name": "ALL_ENEMIES",    "desc": "全部敌方单位" },
+    { "code": 4,  "name": "SINGLE_ALLY",    "desc": "单个友方单位" },
+    { "code": 5,  "name": "ALL_ALLIES",     "desc": "全部友方单位" },
+    { "code": 6,  "name": "RANDOM_ENEMY",   "desc": "随机一个敌方单位" },
+    { "code": 7,  "name": "LOWEST_HP_ALLY", "desc": "生命值最低的友方单位" },
+    { "code": 8,  "name": "REVEALED_AREA",  "desc": "已揭示的区域" },
+    { "code": 9,  "name": "ADJACENT_UNIT",  "desc": "与施法者相邻的单位" },
+    { "code": 10, "name": "HAND_CARD",      "desc": "手牌中的一张卡" }
+  ],
+  "conditionProperties": [
+    { "code": 101, "name": "HP_PERCENT",       "type": "number", "desc": "生命值百分比，取值 0-100" },
+    { "code": 102, "name": "ENERGY",           "type": "number", "desc": "当前能量值" },
+    { "code": 103, "name": "HAND_SIZE",        "type": "number", "desc": "手牌数量" },
+    { "code": 104, "name": "BOARD_UNIT_COUNT", "type": "number", "desc": "己方场上单位数量" },
+    { "code": 105, "name": "TURN_INDEX",       "type": "number", "desc": "当前回合序号，从 1 开始" },
+    { "code": 106, "name": "AREA_INDEX",       "type": "number", "desc": "区域序号，取值 1-3" },
+    { "code": 107, "name": "HAS_TAG",          "type": "bool",   "desc": "目标是否带有指定标签" },
+    { "code": 108, "name": "COST",             "type": "number", "desc": "技能消耗" }
+  ],
+  "effectOps": [
+    { "op": "DAMAGE",     "desc": "造成伤害" },
+    { "op": "HEAL",       "desc": "恢复生命" },
+    { "op": "SHIELD",     "desc": "添加护盾" },
+    { "op": "DRAW_CARD",  "desc": "抽牌" },
+    { "op": "SUMMON",     "desc": "召唤单位" },
+    { "op": "BUFF",       "desc": "添加增益状态" },
+    { "op": "DEBUFF",     "desc": "添加减益状态" }
+  ],
+  "skills": [
+    {
+      "id": 1001,
+      "name": "苍龙破",
+      "type": "ACTIVE",
+      "cost": 3,
+      "tags": ["DAMAGE", "SINGLE"],
+      "description": "对单个敌方单位造成 320 点伤害；若自身生命低于 50%，伤害翻倍。",
+      "effects": [
+        {
+          "seq": 1,
+          "op": "DAMAGE",
+          "value": 320,
+          "targetType": 2,
+          "condition": "HP_PERCENT(SELF) < 50",
+          "conditionNote": "满足时 value 翻倍（320 → 640）"
+        }
+      ]
+    },
+    {
+      "id": 1002,
+      "name": "龙鳞庇护",
+      "type": "ACTIVE",
+      "cost": 2,
+      "tags": ["SHIELD", "ALLY"],
+      "description": "为生命值最低的友方单位提供 180 点护盾，持续 2 回合。",
+      "effects": [
+        {
+          "seq": 1,
+          "op": "SHIELD",
+          "value": 180,
+          "targetType": 7,
+          "duration": 2,
+          "condition": null,
+          "conditionNote": null
+        }
+      ]
+    },
+    {
+      "id": 1003,
+      "name": "千机变",
+      "type": "ACTIVE",
+      "cost": 4,
+      "tags": ["UTILITY", "DRAW"],
+      "description": "抽 2 张牌；手牌数达到 5 张及以上时不触发。",
+      "effects": [
+        {
+          "seq": 1,
+          "op": "DRAW_CARD",
+          "value": 2,
+          "targetType": 1,
+          "condition": "HAND_SIZE < 5",
+          "conditionNote": "手牌满了就抽不动，避免爆牌"
+        }
+      ]
+    },
+    {
+      "id": 1004,
+      "name": "烈火燎原",
+      "type": "ACTIVE",
+      "cost": 6,
+      "tags": ["DAMAGE", "AOE"],
+      "description": "对全部敌方单位造成 240 点伤害；仅在 2 区生效。",
+      "effects": [
+        {
+          "seq": 1,
+          "op": "DAMAGE",
+          "value": 240,
+          "targetType": 3,
+          "condition": "AREA_INDEX == 2",
+          "conditionNote": "这是它的区域限制，说明它是一张位置牌"
+        },
+        {
+          "seq": 2,
+          "op": "DEBUFF",
+          "value": 1,
+          "targetType": 3,
+          "condition": "TURN_INDEX >= 3",
+          "conditionNote": "第 3 回合起附加 1 层灼烧"
+        }
+      ]
+    },
+    {
+      "id": 9001,
+      "name": "龙血·磐石",
+      "type": "ACTIVE",
+      "cost": 5,
+      "tags": ["SPECIAL", "SUMMON"],
+      "description": "在已揭示的区域召唤 1 个磐石守卫，第 3 回合后才能使用。",
+      "effects": [
+        {
+          "seq": 1,
+          "op": "SUMMON",
+          "value": 1,
+          "targetType": 8,
+          "condition": "TURN_INDEX >= 3",
+          "conditionNote": "召唤物固定在已揭示区域，不占手牌"
+        }
+      ]
+    }
+  ]
+}

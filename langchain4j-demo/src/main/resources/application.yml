@@ -14,6 +14,32 @@ langchain4j:
       # 打开后能看到 LangChain4j 实际发出的请求体和返回（顺便可以核对 URL 对不对）
       log-requests: true
       log-responses: true
+      # ============================================================
+      # 取 DeepSeek 的 reasoning_content（思考内容）。
+      #
+      # 这条是与 Spring AI 对照的关键，有三个容易搞错的点：
+      #
+      #   1) 开关叫 return-thinking，不是 return-reasoning。它控制「要不要解析响应里
+      #      的 reasoning_content 字段并填进 AiMessage.thinking()」，默认是 false ——
+      #      所以不配这一项时，即使服务端返回了思考内容，也会被静默丢掉。
+      #
+      #   2) 字段名默认就是 "reasoning_content"（OpenAiChatModel 源码里写死的默认值，
+      #      注释明确点名 "This setting is intended for DeepSeek"）。
+      #
+      #   3) 它**不控制**思考的开与关。LangChain4j 的 OpenAI 兼容模块压根不发
+      #      thinking 参数，而 DeepSeek 服务端默认是「开思考」的 —— 也就是说
+      #      不配这一项时，你照旧为 reasoning token 付了钱，然后把结果扔了。
+      #      Spring AI 侧有 spring.ai.deepseek.chat.thinking.type 可以真正关掉。
+      #
+      #      那 LangChain4j 怎么关？实测（2026-09-16）DeepSeek 认 OpenAI 的
+      #      reasoning_effort 参数，且 reasoning_effort="none" 等效于关掉思考：
+      #          reasoning_effort=none -> 无 reasoning_content，completion 仅 1 token
+      #          reasoning_effort=low/high/max -> 都有 reasoning_content
+      #      而 starter 正好暴露了 reasoning-effort 配置项（源码里接了
+      #      OpenAiChatRequestParameters），所以取消下面一行的注释即可省掉思考开销：
+      # ============================================================
+      return-thinking: true
+      # reasoning-effort: none   # 想省掉思考 token 就把这行的注释去掉
 
     # ============================================================
     # 这一段是必须的，不是可选优化。
@@ -36,9 +62,26 @@ langchain4j:
       temperature: 0.7
       log-requests: true
       log-responses: true
+      # 流式侧同样要开，否则 TokenStream.onPartialThinking(...) 永远收不到东西
+      # （不会报错，只是回调不触发 —— 又是一个「静默失败」）。
+      return-thinking: true
       # 注意：DeepSeek 每个 chunk 都发完整 tool call ID，流式 + 工具调用需要
       # accumulateToolCallId(false)，但它没有对应的 Spring Boot 属性，只能手写 Bean。
       # 详见 README「流式 + 工具调用」一节。
+
+# ============================================================
+# MCP 客户端（第 6 课）
+#
+# 这里只有一个 URL —— 因为 LangChain4j 的 MCP 客户端**全靠手写**，
+# 三个对象（Transport / McpClient / McpToolProvider）都在
+# config/McpClientConfig.java 里 new 出来，没有 Spring Boot 自动配置可配。
+# 对照 Spring AI：那边整段都在 yml 里（spring.ai.mcp.client.*），代码 0 行。
+#
+# 注意这个 key 是我们自己起的名字，不是框架前缀 —— 因为压根没有框架前缀可用。
+# ============================================================
+mcp:
+  skill-server:
+    url: ${MCP_SKILL_URL:http://localhost:8099/mcp}
 
 server:
   port: 8082
