@@ -939,4 +939,15 @@ $env:PATH = "$env:JAVA_HOME\bin;$env:PATH"
    另附一个**最危险的坑**：记忆串槽让对照组"抄"到实验组答案，
    表现为「锚点无效」而不是「实验失败」—— **假通过会直接把错误结论写进文档**。
    详见上面「MCP 实测」一节
-7. 到这一步，你就有能力把它们接进 `AI开发学习` 里那个诊断助手了
+7. ✅ **已完成（2026-09-17）**：把 MCP 接进了 `AI开发学习` 里的诊断助手
+   ——**最小闭环切片**：在 `backend-java` 接 MCP server（同端口 `:8080`，端点 `/mcp`），
+   暴露 1 个受治理的只读工具 `dependency_status`。
+   本步的取舍值得记：那个项目的 MCP issue 依赖链是 09 ← 08 ← 07 ← 06（06 = Phase 1 的 RAG 闭环），
+   而 Phase 1 还没做完 —— 所以这次**只落地接缝，不假装 Phase 1 已完工**：
+   工具清单 / 输入契约 / 白名单拒绝 / 审计四件事全部做完并验证，
+   「检索返回带引用证据」那条等 07 就绪后走同一个接缝接进来。
+   实测：`mvn test` 18 个全绿（新契约测试 5 个，直接按 MCP 协议发 JSON-RPC）；
+   `probe/run-mcp-check.ps1` 对真服务跑裸协议探针全通过，服务侧审计落下 3 条。
+   另记两条环境事实：本机 Maven 本地仓库是 `D:\Software\apache-maven-reop`（不是 `~/.m2`）；
+   **Spring Boot 4 用 Jackson 3，包名变成 `tools.jackson.*`**，且 `JacksonException` 已是非受检异常。
+   详见该项目的 `README.md`「MCP 工具面」与 issue 09 的 Comments
